@@ -1,179 +1,211 @@
-Android 系统 Dumpsys 分析工具
+中文版
 
-一组 Python 脚本，用于分析 Android 系统 dumpsys 命令输出的日志（内存、GPU、CPU、存储）。自动查找最新日志文件，解析并生成详细的可读分析报告。
+Android Dumpsys 日志解析工具箱
 
-脚本概览
+一套用于解析 Android dumpsys 日志的 Python 脚本集合。每个脚本针对特定的子系统（内存、CPU、GPU、存储等），将原始日志转换为结构化、可读的分析报告。
 
-脚本输入文件模式输出内容dumpsys_meminfo.pydumpsys_meminfo_*.txt内存使用报告（RSS/PSS 进程排行、OOM 分类、柱状图）dumpsys_gpuinfo.pydumpsys_gpuinfo_*.txtGPU 驱动信息、每 PID 内存占用、应用详情、工作统计dumpsys_cpuinfo.pydumpsys_cpuinfo_*.txtCPU 负载均值、进程/线程 CPU 占用、缺页信息、柱状图disk.pyapp_size_*.txt存储分区使用情况、应用大小/数据/缓存细分、Top 消费者 
+适用于需要快速从 dumpsys 原始输出中提取关键信息的 Android 开发者、测试人员和性能工程师。
 
-使用方法
+工作流程
 
-1. 准备日志文件
+采集日志 – 在设备上执行对应的 adb 命令，捕获 dumpsys 输出。
 
-将对应的 dumpsys_*.txt 或 app_size_*.txt 文件放入 SOURCE_DIR 指定的目录。
+保存到目录 – 将日志文件保存到本地文件夹（默认为当前目录）。
 
-在 Android 设备上获取这些日志的典型命令：
+运行脚本 – 执行对应子系统的解析脚本。
 
-adb shell dumpsys meminfo > dumpsys_meminfo_YYYYMMDD_HHMMSS.txt adb shell dumpsys gpuinfo > dumpsys_gpuinfo_YYYYMMDD_HHMMSS.txt adb shell dumpsys cpuinfo > dumpsys_cpuinfo_YYYYMMDD_HHMMSS.txt adb shell dumpsys diskstats > app_size_YYYYMMDD_HHMMSS.txt 
+获取报告 – 脚本生成带时间戳的报告文件，内含解析后的数据。
 
-2. 配置路径
+每个脚本遵循相同的模式：
 
-编辑每个脚本顶部的配置区域：
+读取符合特定命名规则的日志文件
 
-SOURCE_DIR = "/storage/emulated/0/文档/日志/状态" # 日志文件存放目录 OUTPUT_DIR = "/storage/emulated/0/文档/文档/txt/内容分析" # 报告输出目录 
+解析关键指标
 
-根据你的实际环境调整路径。
+输出清晰可读的报告
 
-3. 运行脚本
+前置条件
 
-无需额外依赖——仅使用 Python 标准库（os, re, glob, json, datetime, subprocess）。
+Python 3.6+
 
-python3 dumpsys_meminfo.py python3 dumpsys_gpuinfo.py python3 dumpsys_cpuinfo.py python3 disk.py 
+无需外部依赖（所有脚本仅使用 Python 标准库）
 
-每个脚本会打印进度信息和最终输出文件路径。
+Android 设备或模拟器（需开启 adb 调试）
 
-4. 查看报告
+可用脚本
 
-生成的报告为纯文本文件（.txt），命名如：
+脚本用途输入文件模式
+dumpsys_meminfo.py解析内存使用信息dumpsys_meminfo_*.txt
+dumpsys_gpuinfo.py解析 GPU 性能数据dumpsys_gpuinfo_*.txt
+dumpsys_cpuinfo.py解析 CPU 频率与状态dumpsys_cpuinfo_*.txt
+disk.py解析磁盘/存储使用统计disk_*.txt 
 
-dumpsys_meminfo_analysis_20261011_143022.txt dumpsys_gpuinfo_analysis_20261011_143030.txt dumpsys_cpuinfo_analysis_20261011_143035.txt storage_dumpsys_diskstats_analysis_20261011_143040.txt 
+欢迎贡献更多脚本，详见下方贡献指南。
 
-包含格式化的表格、柱状图和分析建议。
+快速开始
 
-输出示例（摘录）
+1. 采集日志
 
-内存报告（dumpsys_meminfo.py）：
+通过 USB 连接设备，执行以下命令。每条命令会保存带时间戳的日志文件，避免覆盖之前的采集结果。
 
-📊 内存分析报告 - 2026-10-11 14:30:00 -------------------------------------------------- 🖥️ 总体内存概况 总 RAM: 5.69 GB 空闲 RAM: 892.1 MB 已用 RAM: 4.81 GB 📌 内存状态: 🟡 内存较为紧张，可清理缓存 🏆 RSS 进程占用排行 (Top 15，总占用 4.32 GB) 1 com.android.systemui 287.4 MB 6.5% 2 com.google.android.gms 245.1 MB 5.5% ... 
+# 内存 adb shell dumpsys meminfo > "dumpsys_meminfo_$(date +%Y%m%d_%H%M%S).txt" # GPU adb shell dumpsys gfxinfo > "dumpsys_gpuinfo_$(date +%Y%m%d_%H%M%S).txt" # CPU adb shell dumpsys cpuinfo > "dumpsys_cpuinfo_$(date +%Y%m%d_%H%M%S).txt" # 存储 adb shell dumpsys diskstats > "disk_$(date +%Y%m%d_%H%M%S).txt" 
 
-GPU 报告（dumpsys_gpuinfo.py）：
+⚠️ 重要提示：文件名中的时间戳是必需的。脚本依赖 YYYYMMDD_HHMMSS 格式的时间戳来识别和排序日志文件。缺少时间戳可能导致文件冲突或解析错误。
 
-🎮 GPU 分析报告 - 2026-10-11 14:30:05 -------------------------------------------------- 📦 驱动信息 稳定驱动 : v@0511.0 GLES加载 : 12 次 (失败: 0) Vulkan加载 : 3 次 (失败: 0) ... 🖥️ GPU内存使用 💾 全局总内存 : 512.00 MB 📊 进程总占用 : 312.48 MB 📈 内存使用率 : 61.0% 
+2. 运行脚本
 
-CPU 报告（dumpsys_cpuinfo.py）：
+python3 dumpsys_meminfo.py 
 
-📊 CPU 分析报告 - 2026-10-11 14:31:00 -------------------------------------------------- 📈 系统负载 1分钟 : 3.52 5分钟 : 2.89 15分钟 : 2.41 📌 状态: 🟢 负载平稳 🖥️ 总体 CPU 占用 总占用 : 68.2% 用户态 : 42.1% 内核态 : 26.1% 
+默认情况下，每个脚本扫描当前目录下匹配的日志文件。可通过修改脚本顶部的常量来配置输入/输出路径。
 
-存储报告（disk.py）：
+3. 查看报告
 
-📊 存储分析报告 - 2026-10-11 14:32:00 -------------------------------------------------- 📈 空间使用概况 📂 数据空间: 总容量: 109.23 GB 已使用: 85.67 GB (78.4%) 可 用: 23.57 GB (21.6%) 状 态: ⚠️ 紧张 🏆 Top 10 数据占用最多的应用 1. com.tencent.mm 数据: 12.34 GB (应用: 456.7 MB, 缓存: 890.2 MB) 2. com.android.chrome 数据: 3.21 GB ... 
+报告以带时间戳的文本文件形式保存在输出目录中。示例：
 
-自定义
+meminfo_report_20261011_143022.txt 
 
-你可以在每个脚本中修改以下常量：
+自定义配置
 
-SOURCE_DIR – 输入日志目录。
+每个脚本顶部都有可配置的常量：
 
-OUTPUT_DIR – 输出报告目录。
+INPUT_DIR – 日志文件所在目录（默认：./）
 
-OOM_CN_MAP（meminfo）– OOM 分类的中文名称。
+OUTPUT_DIR – 报告输出目录（默认：./）
 
-GPU_STATE_CN（gpuinfo）– GPU 状态描述。
+文件命名匹配模式
 
-CPU_STATE_CN（cpuinfo）– CPU 状态描述。
+直接用文本编辑器打开脚本修改即可。
 
-TOP_N 值 – 排行榜显示的数量（目前硬编码在函数内部，可根据需要调整）。
+添加新脚本
+
+本工具箱设计为可扩展的。要添加新的解析器：
+
+参照现有脚本的模式创建新的 .py 文件
+
+定义输入文件的命名规则
+
+使用标准库实现解析逻辑
+
+更新本 README 的脚本表格
+
+欢迎贡献代码！详情请参阅 CONTRIBUTING.md。
 
 注意事项
 
-所有脚本假定输入文件的格式与 Android dumpsys 命令输出的格式完全一致。若格式发生变化，解析可能失败。
+脚本期望日志严格按照快速开始部分所示的方式采集。格式差异可能导致解析失败。
 
-disk.py 使用 json.loads 解析包名列表；请确保输入文件包含有效的 JSON 数组。
+disk.py 内部使用 json.loads()，请确保日志文件包含有效的 JSON 结构。
 
-dumpsys_gpuinfo.py 可选地调用 ps 命令通过 PID 获取包名；在 Linux/macOS 上正常工作，Windows 可能需要调整。
+dumpsys_gpuinfo.py 在解析过程中会调用系统 ps 命令。
 
-报告以 UTF-8 纯文本生成，可在任何文本编辑器或终端中打开。
+所有脚本均假设为单设备环境。多设备场景请在 adb 命令中指定序列号。
 
-许可
+文件名中的时间戳格式 YYYYMMDD_HHMMSS 是必需的，缺少正确时间戳的文件可能导致脚本拒绝处理或产生异常结果。
 
-本项目仅供学习和诊断用途，欢迎自由使用和修改。
+许可证
 
-Android System Dumpsys Analyzer
+MIT 许可证 — 详见 LICENSE 文件。
 
-A collection of Python scripts to analyze Android system dumpsys outputs (memory, GPU, CPU, storage). These scripts automatically find the latest log files, parse them, and generate detailed human-readable analysis reports.
+English Version
 
-Scripts Overview
+Android Dumpsys Log Parser Toolkit
 
-ScriptInput PatternOutput Descriptiondumpsys_meminfo.pydumpsys_meminfo_*.txtMemory usage report (RSS/PSS per process, OOM categories, bar charts)dumpsys_gpuinfo.pydumpsys_gpuinfo_*.txtGPU driver info, memory usage per PID, application details, work statisticsdumpsys_cpuinfo.pydumpsys_cpuinfo_*.txtCPU load average, per-process/thread CPU usage, faults, bar chartsdisk.pyapp_size_*.txtStorage partition usage, app sizes/data/cache breakdown, top consumers 
+A collection of Python scripts for parsing Android dumpsys logs into human-readable reports. Each script targets a specific subsystem (memory, CPU, GPU, storage, etc.) and outputs structured analysis results.
 
-How to Use
+Designed for Android developers, testers, and performance engineers who need to quickly extract insights from raw dumpsys output.
 
-1. Prepare Log Files
+How It Works
 
-Place the corresponding dumpsys_*.txt or app_size_*.txt files in the directory specified by SOURCE_DIR.
+Collect logs – Run the corresponding adb command on your device to capture dumpsys output.
 
-Typical commands to obtain these logs on an Android device:
+Save to directory – Place the log files in a local folder (default: current directory).
 
-adb shell dumpsys meminfo > dumpsys_meminfo_YYYYMMDD_HHMMSS.txt adb shell dumpsys gpuinfo > dumpsys_gpuinfo_YYYYMMDD_HHMMSS.txt adb shell dumpsys cpuinfo > dumpsys_cpuinfo_YYYYMMDD_HHMMSS.txt adb shell dumpsys diskstats > app_size_YYYYMMDD_HHMMSS.txt 
+Run a script – Execute the parser for the subsystem you want to analyze.
 
-2. Configure Paths
+Get report – The script generates a timestamped report file with parsed data.
 
-Edit each script’s configuration section at the top:
+Each script follows the same pattern:
 
-SOURCE_DIR = "/storage/emulated/0/文档/日志/状态" # where your log files are stored OUTPUT_DIR = "/storage/emulated/0/文档/文档/txt/内容分析" # where reports will be saved 
+Reads log files matching a specific naming pattern
 
-Adjust these paths to match your environment.
+Parses key metrics
 
-3. Run the Scripts
+Outputs a clean, readable report
 
-No extra dependencies – only standard Python libraries are used (os, re, glob, json, datetime, subprocess).
+Prerequisites
 
-python3 dumpsys_meminfo.py python3 dumpsys_gpuinfo.py python3 dumpsys_cpuinfo.py python3 disk.py 
+Python 3.6+
 
-Each script will print progress messages and the final output file path.
+No external dependencies (all scripts use only standard library)
 
-4. View Reports
+Android device or emulator with adb access enabled
 
-Generated reports are plain text files with .txt extension, named like:
+Available Scripts
 
-dumpsys_meminfo_analysis_20261011_143022.txt dumpsys_gpuinfo_analysis_20261011_143030.txt dumpsys_cpuinfo_analysis_20261011_143035.txt storage_dumpsys_diskstats_analysis_20261011_143040.txt 
+ScriptPurposeInput Patterndumpsys_meminfo.pyParse memory usage infodumpsys_meminfo_*.txtdumpsys_gpuinfo.pyParse GPU profiling datadumpsys_gpuinfo_*.txtdumpsys_cpuinfo.pyParse CPU frequency/statsdumpsys_cpuinfo_*.txtdisk.pyParse disk/storage usage statsdisk_*.txt 
 
-They contain formatted tables, bar charts, and analysis suggestions.
+More scripts welcome — see Contributing below.
 
-Sample Output (Excerpt)
+Quick Start
 
-Memory Report (dumpsys_meminfo.py):
+1. Collect Logs
 
-📊 内存分析报告 - 2026-10-11 14:30:00 -------------------------------------------------- 🖥️ 总体内存概况 总 RAM: 5.69 GB 空闲 RAM: 892.1 MB 已用 RAM: 4.81 GB 📌 内存状态: 🟡 内存较为紧张，可清理缓存 🏆 RSS 进程占用排行 (Top 15，总占用 4.32 GB) 1 com.android.systemui 287.4 MB 6.5% 2 com.google.android.gms 245.1 MB 5.5% ... 
+Connect your device via USB and run the following commands. Each command saves a timestamped log file to prevent overwriting previous captures.
 
-GPU Report (dumpsys_gpuinfo.py):
+# Memory adb shell dumpsys meminfo > "dumpsys_meminfo_$(date +%Y%m%d_%H%M%S).txt" # GPU adb shell dumpsys gfxinfo > "dumpsys_gpuinfo_$(date +%Y%m%d_%H%M%S).txt" # CPU adb shell dumpsys cpuinfo > "dumpsys_cpuinfo_$(date +%Y%m%d_%H%M%S).txt" # Disk / Storage adb shell dumpsys diskstats > "disk_$(date +%Y%m%d_%H%M%S).txt" 
 
-🎮 GPU 分析报告 - 2026-10-11 14:30:05 -------------------------------------------------- 📦 驱动信息 稳定驱动 : v@0511.0 GLES加载 : 12 次 (失败: 0) Vulkan加载 : 3 次 (失败: 0) ... 🖥️ GPU内存使用 💾 全局总内存 : 512.00 MB 📊 进程总占用 : 312.48 MB 📈 内存使用率 : 61.0% 
+⚠️ Important: Timestamps in filenames are required. Scripts rely on the YYYYMMDD_HHMMSS pattern to identify and sort log files. Missing timestamps may cause file collisions or parsing errors.
 
-CPU Report (dumpsys_cpuinfo.py):
+2. Run a Script
 
-📊 CPU 分析报告 - 2026-10-11 14:31:00 -------------------------------------------------- 📈 系统负载 1分钟 : 3.52 5分钟 : 2.89 15分钟 : 2.41 📌 状态: 🟢 负载平稳 🖥️ 总体 CPU 占用 总占用 : 68.2% 用户态 : 42.1% 内核态 : 26.1% 
+python3 dumpsys_meminfo.py 
 
-Storage Report (disk.py):
+By default, each script scans the current directory for matching log files. You can configure input/output paths by editing the constants at the top of each script.
 
-📊 存储分析报告 - 2026-10-11 14:32:00 -------------------------------------------------- 📈 空间使用概况 📂 数据空间: 总容量: 109.23 GB 已使用: 85.67 GB (78.4%) 可 用: 23.57 GB (21.6%) 状 态: ⚠️ 紧张 🏆 Top 10 数据占用最多的应用 1. com.tencent.mm 数据: 12.34 GB (应用: 456.7 MB, 缓存: 890.2 MB) 2. com.android.chrome 数据: 3.21 GB ... 
+3. View Report
+
+Reports are saved as timestamped text files in the output directory. Example:
+
+meminfo_report_20261011_143022.txt 
 
 Customization
 
-You can modify the following constants in each script:
+Each script has configurable constants at the top:
 
-SOURCE_DIR – input log directory.
+INPUT_DIR – Directory containing log files (default: ./)
 
-OUTPUT_DIR – output report directory.
+OUTPUT_DIR – Directory for generated reports (default: ./)
 
-OOM_CN_MAP (meminfo) – OOM category Chinese names.
+File name patterns for log matching
 
-GPU_STATE_CN (gpuinfo) – GPU state descriptions.
+Open the script in any text editor to adjust these values.
 
-CPU_STATE_CN (cpuinfo) – CPU state descriptions.
+Adding New Scripts
 
-TOP_N values – number of items shown in rankings (currently hardcoded, adjustable inside functions).
+This toolkit is designed to be extensible. To add a new parser:
+
+Create a new .py file following the existing pattern
+
+Define input file naming convention
+
+Implement parsing logic using only standard library
+
+Update this README's script table
+
+Contributions are welcome! See CONTRIBUTING.md for details.
 
 Notes
 
-All scripts assume the input files follow the exact format produced by dumpsys on Android. If the format changes, parsing may fail.
+Scripts expect logs to be captured exactly as shown in the Quick Start section. Format variations may cause parsing errors.
 
-The disk.py script uses json.loads for package lists; ensure the input file contains valid JSON arrays.
+disk.py uses json.loads() internally; ensure your log file contains valid JSON-like structures.
 
-The dumpsys_gpuinfo.py script optionally calls ps command to resolve package names by PID; it works on Linux/macOS but may require adjustments on Windows.
+dumpsys_gpuinfo.py calls the system ps command during parsing.
 
-Reports are generated in UTF-8 plain text; they can be opened in any text editor or terminal.
+All scripts assume a single-device environment. For multi-device setups, specify the serial number in adb commands.
+
+Timestamp format YYYYMMDD_HHMMSS in filenames is mandatory. Files without proper timestamps may be rejected or produce incorrect results.
 
 License
 
-This project is provided for educational and diagnostic purposes. Feel free to use and modify.
+MIT License — see LICENSE for details.
